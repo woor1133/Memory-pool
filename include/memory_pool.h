@@ -1,40 +1,97 @@
 #pragma once
+#include <cstdint>
 #include <cstddef>
+#include <utility>
 #define BLOCK_SIZE 4096
+#define POOLS_NUM 64
 namespace hui{
 
 class MemoryPool{
+private:
+    struct slot{
+        slot* next;
+    };
 public:
+    MemoryPool(){
+        slot_size_ = 0;
+        free_slot_ptr_ = nullptr;
+        cur_slot_ptr_ = nullptr;
+        first_slot_ptr_ = nullptr;
+        last_slot_ptr_ = nullptr;
+    }
+
     MemoryPool(size_t slot_size)  //构造函数
     {
         slot_size_ = slot_size;
         free_slot_ptr_ = nullptr;
         cur_slot_ptr_ = nullptr;
         first_slot_ptr_ = nullptr;
+        last_slot_ptr_ = nullptr;
     }
     ~MemoryPool(){}
-
-    void allocate();
-    void deallocate();
+    void SetSlotSize(size_t slot_size){this->slot_size_ = slot_size;}
+    void* Allocate();
+    void Deallocate(void* memory_ptr);
     
 private:
-
+    void AllocateBlock();
+    void* MemoryAlign(std::uintptr_t address,size_t align_value);
 private:
-    struct slot{
-
-    };
     std::size_t         slot_size_;
     std::size_t         block_size_ = BLOCK_SIZE;
     slot*               free_slot_ptr_;
     slot*               cur_slot_ptr_;
     slot*               first_slot_ptr_;
+    slot*               last_slot_ptr_;
 
 };
 
-template <typename T>
-T* NewElement(){}
+
+
+class HashTable{
+public:
+    static void InitMemoryPools(){
+        
+        for(int i =0 ; i < POOLS_NUM ; i++){
+            memory_pools_[i].SetSlotSize((i+1)*8);
+        }
+    }
+
+
+    static void* UseMemory(size_t T_size){
+        int key = (T_size - 1) / 8;
+        return memory_pools_[key].Allocate();
+    }
+
+    static void FreeMemory(size_t T_size,void* memory_ptr){
+        int key = (T_size - 1) / 8;
+        memory_pools_[key].Deallocate(memory_ptr);
+    }
+private:
+    static MemoryPool memory_pools_[POOLS_NUM];
+};
+
+
+
+template <typename T,typename... Args>
+T* NewElement(Args&&... args){
+    size_t T_size = sizeof(T);
+    //大内存直接分配
+    if(T_size > 512) return new T(std::forward<Args>(args)...);
+    //分配区域并实例化对象(完美转发)
+    else return  new (reinterpret_cast<T*>(HashTable::UseMemory(T_size))) T(std::forward<Args>(args)...);
+}
 
 template <typename T>
-void DeleteElement(T* delete_element){}
+void DeleteElement(T* delete_element){
+    //对象析构
+    delete_element->~T();
+
+    size_t T_size = sizeof(T);
+    //大内存直接使用系统调用
+    if(T_size > 512) operator delete(delete_element);
+    //回收内存
+    else HashTable::FreeMemory(T_size, reinterpret_cast<void*>(delete_element));
+}
 
 }
