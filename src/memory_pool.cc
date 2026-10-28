@@ -1,6 +1,7 @@
 #include"../include/memory_pool.h"
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 
 
 namespace hui{
@@ -9,11 +10,14 @@ MemoryPool HashTable::memory_pools_[POOLS_NUM] = {};
 void* MemoryPool::Allocate(){
     //查找空闲块
     if(free_slot_ptr_ != nullptr){
-        return reinterpret_cast<void*>(free_slot_ptr_);
+        std::lock_guard<std::mutex> lock(mutex_for_free_list_);
+        slot* ptr = free_slot_ptr_;
         free_slot_ptr_ = free_slot_ptr_->next;
+        return reinterpret_cast<void*>(ptr);
     }
     //尝试从当前slot开始分配
     else{
+        std::lock_guard<std::mutex> lock(mutex_for_block_);
         if(cur_slot_ptr_ >= last_slot_ptr_ || last_slot_ptr_ == nullptr){
             AllocateBlock();
         }
@@ -26,6 +30,7 @@ void* MemoryPool::Allocate(){
 void MemoryPool::Deallocate(void* memory_ptr){
         //直接将内存区域回收到freelist中
         if(memory_ptr != nullptr){
+            std::lock_guard<std::mutex> lock(mutex_for_free_list_);
             reinterpret_cast<slot*>(memory_ptr)->next = first_slot_ptr_;
             first_slot_ptr_ = reinterpret_cast<slot*>(memory_ptr);
     }

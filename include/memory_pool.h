@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <mutex>
 #include <utility>
 #define BLOCK_SIZE 4096
 #define POOLS_NUM 64
@@ -43,6 +44,9 @@ private:
     slot*               cur_slot_ptr_;
     slot*               first_slot_ptr_;
     slot*               last_slot_ptr_;
+
+    std::mutex mutex_for_free_list_;
+    std::mutex mutex_for_block_;
 
 };
 
