@@ -1,21 +1,54 @@
-# 指定 cmake 最低版本
 cmake_minimum_required(VERSION 3.10)
 
-# 设定debug模式
-#set(CMAKE_BUILD_TYPE Debug)
+project(Memory-pool LANGUAGES CXX)
 
-# 指定 C++ 标准，不强制要求使用该标准
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# 项目名称
-project(Memory-pool CXX)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING
+        "Build type: Debug, Release, RelWithDebInfo or MinSizeRel" FORCE)
+endif()
 
-# 指定源文件
-FILE(GLOB SRC_FILES "src/*.cc")
-FILE(GLOB TEST_FILES "test/*.cc")
+find_package(Threads REQUIRED)
 
-#添加可执行文件目标
-add_executable(${PROJECT_NAME} 
-    ${TEST_FILES}
-    ${SRC_FILES}
+add_library(memory_pool STATIC
+    src/memory_pool.cc
 )
+target_include_directories(memory_pool PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(memory_pool PUBLIC Threads::Threads)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(memory_pool PRIVATE
+        -Wall -Wextra -Wpedantic
+    )
+endif()
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(correctness_test
+        test/correctness_test.cc
+    )
+    target_link_libraries(correctness_test PRIVATE memory_pool)
+
+    add_executable(performance_test
+        test/performance_test.cc
+    )
+    target_link_libraries(performance_test PRIVATE memory_pool)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(correctness_test PRIVATE
+            -Wall -Wextra -Wpedantic
+        )
+        target_compile_options(performance_test PRIVATE
+            -Wall -Wextra -Wpedantic
+        )
+    endif()
+
+    add_test(NAME correctness COMMAND correctness_test)
+    set_tests_properties(correctness PROPERTIES TIMEOUT 120)
+endif()

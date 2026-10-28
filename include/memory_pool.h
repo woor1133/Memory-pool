@@ -81,6 +81,7 @@ template <typename T,typename... Args>
 T* NewElement(Args&&... args){
     size_t T_size = sizeof(T);
     //大内存直接分配
+    //!!!注意：在 x86-64 Linux 上，普通 new 最终通常依赖 malloc，一般只保证 16 字节对齐。它有时可能恰好返回 128 字节对齐的地址，但这不是接口保证
     if(T_size > 512) return new T(std::forward<Args>(args)...);
     //分配区域并实例化对象(完美转发)
     else return  new (reinterpret_cast<T*>(HashTable::UseMemory(T_size))) T(std::forward<Args>(args)...);

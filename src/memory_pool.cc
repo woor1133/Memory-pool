@@ -9,10 +9,13 @@ MemoryPool HashTable::memory_pools_[POOLS_NUM] = {};
 
 void* MemoryPool::Allocate(){
     //查找空闲块
+    std::lock_guard<std::mutex> lock(mutex_for_free_list_);
     if(free_slot_ptr_ != nullptr){
-        std::lock_guard<std::mutex> lock(mutex_for_free_list_);
         slot* ptr = free_slot_ptr_;
-        free_slot_ptr_ = free_slot_ptr_->next;
+        if(free_slot_ptr_->next != nullptr)
+            free_slot_ptr_ = free_slot_ptr_->next;
+        else 
+            free_slot_ptr_ = nullptr;
         return reinterpret_cast<void*>(ptr);
     }
     //尝试从当前slot开始分配
@@ -31,8 +34,8 @@ void MemoryPool::Deallocate(void* memory_ptr){
         //直接将内存区域回收到freelist中
         if(memory_ptr != nullptr){
             std::lock_guard<std::mutex> lock(mutex_for_free_list_);
-            reinterpret_cast<slot*>(memory_ptr)->next = first_slot_ptr_;
-            first_slot_ptr_ = reinterpret_cast<slot*>(memory_ptr);
+            reinterpret_cast<slot*>(memory_ptr)->next = free_slot_ptr_;
+            free_slot_ptr_ = reinterpret_cast<slot*>(memory_ptr);
     }
 }
 
