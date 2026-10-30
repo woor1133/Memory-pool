@@ -1,4 +1,5 @@
 #include "memory_pool.h"
+#include "thread_cache.h"
 #include "test_support.h"
 
 #include <algorithm>

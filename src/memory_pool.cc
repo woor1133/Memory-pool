@@ -5,21 +5,24 @@
 
 
 namespace hui{
+thread_local ThreadCache cache;
 MemoryPool HashTable::memory_pools_[POOLS_NUM] = {};
 
 void* MemoryPool::Allocate(){
     //查找空闲块
-    std::lock_guard<std::mutex> lock(mutex_for_free_list_);
-    if(free_slot_ptr_ != nullptr){
-        slot* ptr = free_slot_ptr_;
-        if(free_slot_ptr_->next != nullptr)
-            free_slot_ptr_ = free_slot_ptr_->next;
-        else 
-            free_slot_ptr_ = nullptr;
-        return reinterpret_cast<void*>(ptr);
+    {
+        std::lock_guard<std::mutex> lock(mutex_for_free_list_);
+        if(free_slot_ptr_ != nullptr){
+            slot* ptr = free_slot_ptr_;
+            if(free_slot_ptr_->next != nullptr)
+                free_slot_ptr_ = free_slot_ptr_->next;
+            else 
+                free_slot_ptr_ = nullptr;
+            return reinterpret_cast<void*>(ptr);
+        }
     }
     //尝试从当前slot开始分配
-    else{
+    {
         std::lock_guard<std::mutex> lock(mutex_for_block_);
         if(cur_slot_ptr_ >= last_slot_ptr_ || last_slot_ptr_ == nullptr){
             AllocateBlock();
@@ -57,5 +60,7 @@ void MemoryPool::AllocateBlock(){
 void* MemoryPool::MemoryAlign(uintptr_t address,size_t align_value){
     return reinterpret_cast<void*>((address + align_value - 1) & ~(align_value - 1));
 }
+
+
 
 }

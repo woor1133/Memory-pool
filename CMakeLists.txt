@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(Memory-pool LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -15,6 +15,7 @@ find_package(Threads REQUIRED)
 
 add_library(memory_pool STATIC
     src/memory_pool.cc
+    src/thread_cache.cc
 )
 target_include_directories(memory_pool PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <mutex>
 #include <utility>
+#include <thread>
+#include "thread_cache.h"
 #define BLOCK_SIZE 4096
 #define POOLS_NUM 64
 namespace hui{
@@ -35,6 +37,7 @@ public:
     void Deallocate(void* memory_ptr);
     
 private:
+
     void AllocateBlock();
     void* MemoryAlign(std::uintptr_t address,size_t align_value);
 private:
@@ -75,7 +78,7 @@ private:
     static MemoryPool memory_pools_[POOLS_NUM];
 };
 
-
+extern thread_local ThreadCache cache;
 
 template <typename T,typename... Args>
 T* NewElement(Args&&... args){
@@ -83,6 +86,11 @@ T* NewElement(Args&&... args){
     //大内存直接分配
     //!!!注意：在 x86-64 Linux 上，普通 new 最终通常依赖 malloc，一般只保证 16 字节对齐。它有时可能恰好返回 128 字节对齐的地址，但这不是接口保证
     if(T_size > 512) return new T(std::forward<Args>(args)...);
+
+    else if (void* addr = cache.AllocateInCache(T_size); addr != nullptr) {
+        return new(reinterpret_cast<T*>(addr)) T(std::forward<Args>(args)...);
+    }
+
     //分配区域并实例化对象(完美转发)
     else return  new (reinterpret_cast<T*>(HashTable::UseMemory(T_size))) T(std::forward<Args>(args)...);
 }
@@ -95,6 +103,10 @@ void DeleteElement(T* delete_element){
     size_t T_size = sizeof(T);
     //大内存直接使用系统调用
     if(T_size > 512) operator delete(delete_element);
+
+    else if(int res = cache.DeleteInCache(T_size, reinterpret_cast<void*>(delete_element));res == 1)
+        return;
+
     //回收内存
     else HashTable::FreeMemory(T_size, reinterpret_cast<void*>(delete_element));
 }
